@@ -15,7 +15,9 @@
   --muted:#969cab
 }
 
-*{box-sizing:border-box}
+*{
+  box-sizing:border-box
+}
 
 body{
   margin:0;
@@ -24,7 +26,10 @@ body{
   font:14px Arial,sans-serif
 }
 
-button,input,textarea,select{
+button,
+input,
+textarea,
+select{
   font:inherit
 }
 
@@ -378,6 +383,18 @@ h3{
   z-index:200
 }
 
+.debug{
+  margin-top:12px;
+  padding:10px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:#0c0e13;
+  font-family:monospace;
+  font-size:10px;
+  white-space:pre-wrap;
+  word-break:break-word
+}
+
 @media(max-width:1050px){
   .layout{
     grid-template-columns:210px 1fr
@@ -589,6 +606,15 @@ Select a block.
 
 <script>
 
+/*
+=========================================================
+MY ARENA EMAIL SUITE
+VERSION: 2026-09-09-LISTMONK-FIX-01
+=========================================================
+*/
+
+const APP_VERSION='2026-09-09-LISTMONK-FIX-01';
+
 const S={
   blocks:[],
   selected:null,
@@ -733,6 +759,11 @@ function redo(){
 
 function add(t){
 
+  if(!D[t]){
+    toast('Unknown block type: '+t);
+    return;
+  }
+
   snap();
 
   let b={
@@ -776,7 +807,7 @@ function newEmail(){
 
   S.projectId=null;
 
-  S.selected=S.blocks[0].id;
+  S.selected=S.blocks[0]?.id||null;
 
   render();
 }
@@ -784,13 +815,12 @@ function newEmail(){
 function esc(s){
 
   return String(s??'').replace(
-    /[&<>\"]/g,
+    /[&<>"]/g,
     m=>({
       '&':'&amp;',
       '<':'&lt;',
       '>':'&gt;',
-      '"':'&quot;',
-      '\\':'&#92;'
+      '"':'&quot;'
     }[m])
   );
 }
@@ -888,9 +918,12 @@ function block(b){
   if(b.type==='features')
     return `
       <section class="emailblock features${q}" data-id="${b.id}">
-        ${b.data.items.map(x=>`
-          <div class="feature">${esc(x)}</div>
-        `).join('')}
+        ${Array.isArray(b.data.items)
+          ?b.data.items.map(x=>`
+            <div class="feature">${esc(x)}</div>
+          `).join('')
+          :''
+        }
       </section>
     `;
 
@@ -923,12 +956,15 @@ function block(b){
 
 function render(){
 
-  device.innerHTML=S.blocks
+  const d=document.getElementById('device');
+
+  if(!d)return;
+
+  d.innerHTML=S.blocks
     .map(block)
     .join('');
 
-  device
-    .querySelectorAll('.emailblock')
+  d.querySelectorAll('.emailblock')
     .forEach(e=>{
 
       e.onclick=x=>{
@@ -1118,13 +1154,13 @@ function moveBefore(src,dst){
 
   if(!src||src===dst)return;
 
-  snap();
-
   let i=S.blocks.findIndex(
     x=>x.id===src
   );
 
   if(i<0)return;
+
+  snap();
 
   let[b]=S.blocks.splice(i,1);
 
@@ -1149,7 +1185,11 @@ function moveBefore(src,dst){
 
 function previewMode(m){
 
-  device.style.width=
+  const d=document.getElementById('device');
+
+  if(!d)return;
+
+  d.style.width=
     m==='mobile'
     ?'390px'
     :'620px';
@@ -1433,7 +1473,8 @@ function emailBlock(b){
         <td style="padding:20px 25px">
 
           ${
-            b.data.items.map(x=>`
+            Array.isArray(b.data.items)
+            ?b.data.items.map(x=>`
               <div style="
                 padding:11px 0;
                 border-bottom:1px solid #e5e7eb
@@ -1441,6 +1482,7 @@ function emailBlock(b){
                 ${esc(x)}
               </div>
             `).join('')
+            :''
           }
 
         </td>
@@ -1504,13 +1546,19 @@ function emailBlock(b){
   return `
     <tr>
       <td>
-        ${b.data.code}
+        ${b.data.code||''}
       </td>
     </tr>
   `;
 }
 
 function emailHTML(){
+
+  const subj=
+    document.getElementById('subject')?.value||'';
+
+  const ph=
+    document.getElementById('preheader')?.value||'';
 
   return `
 <!doctype html>
@@ -1525,7 +1573,7 @@ function emailHTML(){
   content="width=device-width,initial-scale=1"
 >
 
-<title>${esc(subject.value)}</title>
+<title>${esc(subj)}</title>
 
 </head>
 
@@ -1540,7 +1588,7 @@ function emailHTML(){
   max-height:0;
   overflow:hidden
 ">
-${esc(preheader.value)}
+${esc(ph)}
 </div>
 
 <table
@@ -1593,13 +1641,15 @@ function toast(t){
 
   setTimeout(
     ()=>x.style.display='none',
-    2600
+    3000
   );
 }
 
 function modal(h){
 
-  modalbox.innerHTML=h;
+  const box=document.getElementById('modalbox');
+
+  box.innerHTML=h;
 
   document
     .getElementById('modal')
@@ -1636,6 +1686,11 @@ function exportHTML(){
   a.download='my-arena-email.html';
 
   a.click();
+
+  setTimeout(
+    ()=>URL.revokeObjectURL(a.href),
+    1000
+  );
 }
 
 
@@ -1671,9 +1726,18 @@ async function api(u,o={}){
 
   try{
 
-    body=o.body
-      ?JSON.parse(o.body)
-      :undefined;
+    if(
+      o.body!==undefined &&
+      o.body!==null &&
+      o.body!==''
+    ){
+
+      body=
+        typeof o.body==='string'
+        ?JSON.parse(o.body)
+        :o.body;
+
+    }
 
   }catch(e){
 
@@ -1691,9 +1755,22 @@ async function api(u,o={}){
 
   if(u==='/api/session/connect'){
 
-    let c=JSON.parse(
-      o.body||'{}'
-    );
+    let c;
+
+    try{
+
+      c=
+        typeof o.body==='string'
+        ?JSON.parse(o.body||'{}')
+        :(o.body||{});
+
+    }catch{
+
+      throw Error(
+        'Invalid connection data'
+      );
+
+    }
 
     let r=await fetch(
       '/.netlify/functions/api',
@@ -1738,6 +1815,9 @@ async function api(u,o={}){
       token:''
     };
 
+    S.lists=[];
+    S.templates=[];
+
     return {
       connected:false
     };
@@ -1748,6 +1828,24 @@ async function api(u,o={}){
 
   if(u.startsWith('/api/listmonk/')){
 
+    if(!LM.url||!LM.username||!LM.token){
+
+      throw Error(
+        'Listmonk is not connected'
+      );
+
+    }
+
+    let method=
+      String(
+        o.method||'GET'
+      ).toUpperCase();
+
+    let requestBody=
+      !['GET','HEAD'].includes(method)
+      ?body
+      :undefined;
+
     let r=await fetch(
       '/.netlify/functions/api',
       {
@@ -1755,9 +1853,9 @@ async function api(u,o={}){
         headers:lmHeaders(),
         body:JSON.stringify({
           action:'request',
-          method:o.method||'GET',
+          method:method,
           path:path,
-          body:body
+          body:requestBody
         })
       }
     );
@@ -1768,11 +1866,14 @@ async function api(u,o={}){
       j=await r.json();
     }catch{}
 
-    if(!r.ok)
+    if(!r.ok){
+
       throw Error(
         j.detail||
-        'Request failed'
+        `Request failed (${r.status})`
       );
+
+    }
 
     return j;
   }
@@ -1805,7 +1906,7 @@ async function openListmonk(){
       <input
         id="lmurl"
         value="${esc(LM.url)}"
-        placeholder="https://campaigns.example.com"
+        placeholder="https://campaigns.my-arenagames.com"
       >
 
     </div>
@@ -1828,6 +1929,8 @@ async function openListmonk(){
       <input
         id="lmtoken"
         type="password"
+        autocomplete="off"
+        placeholder="API token"
       >
 
     </div>
@@ -1853,6 +1956,7 @@ async function openListmonk(){
     <div
       id="lmout"
       class="small"
+      style="margin-top:12px"
     ></div>
 
   `);
@@ -1869,6 +1973,8 @@ function setStatus(text,state){
     'status'
   );
 
+  if(!el)return;
+
   el.textContent=text;
 
   el.classList.remove(
@@ -1878,6 +1984,7 @@ function setStatus(text,state){
 
   if(state)
     el.classList.add(state);
+
 }
 
 
@@ -1887,12 +1994,16 @@ function setStatus(text,state){
 
 async function connect(){
 
+  const urlEl=document.getElementById('lmurl');
+  const userEl=document.getElementById('lmuser');
+  const tokenEl=document.getElementById('lmtoken');
+
   try{
 
     let c={
-      url:lmurl.value.trim(),
-      username:lmuser.value.trim(),
-      token:lmtoken.value
+      url:urlEl?.value.trim()||'',
+      username:userEl?.value.trim()||'',
+      token:tokenEl?.value||''
     };
 
     if(!c.url)
@@ -1910,6 +2021,11 @@ async function connect(){
         'Enter the API token'
       );
 
+    setStatus(
+      'Listmonk · Connecting…',
+      null
+    );
+
     let r=await api(
       '/api/session/connect',
       {
@@ -1922,6 +2038,14 @@ async function connect(){
       }
     );
 
+    if(!r||r.connected!==true){
+
+      throw Error(
+        'Listmonk connection was not confirmed.'
+      );
+
+    }
+
     LM=c;
 
     setStatus(
@@ -1929,24 +2053,13 @@ async function connect(){
       'ok'
     );
 
-    closeModal();
-
     toast(
       'Listmonk connected'
     );
 
-    try{
+    await loadLM();
 
-      await loadLM();
-
-    }catch(e){
-
-      toast(
-        'Connected, but failed to load lists: '+
-        e.message
-      );
-
-    }
+    closeModal();
 
   }catch(e){
 
@@ -1962,6 +2075,11 @@ async function connect(){
 
     if(out)
       out.textContent=e.message;
+
+    console.error(
+      'Listmonk connect error:',
+      e
+    );
   }
 }
 
@@ -1978,12 +2096,54 @@ async function disconnect(){
     token:''
   };
 
+  S.lists=[];
+  S.templates=[];
+
   setStatus(
     'Not connected',
     null
   );
 
   closeModal();
+
+  toast(
+    'Listmonk disconnected'
+  );
+}
+
+
+/* =========================================================
+   NORMALIZE LISTMONK RESULTS
+========================================================= */
+
+function normalizeListmonkResults(response){
+
+  if(!response)
+    return [];
+
+  if(Array.isArray(response))
+    return response;
+
+  if(
+    response.data &&
+    Array.isArray(response.data)
+  )
+    return response.data;
+
+  if(
+    response.results &&
+    Array.isArray(response.results)
+  )
+    return response.results;
+
+  if(
+    response.data &&
+    typeof response.data==='object' &&
+    Array.isArray(response.data.results)
+  )
+    return response.data.results;
+
+  return [];
 }
 
 
@@ -1993,59 +2153,100 @@ async function disconnect(){
 
 async function loadLM(){
 
-  if(!LM.token)
+  if(
+    !LM.url||
+    !LM.username||
+    !LM.token
+  ){
+
     throw Error(
       'Connect to Listmonk first'
     );
 
-  let[l,t]=await Promise.all([
+  }
 
-    api('/api/listmonk/lists'),
+  setStatus(
+    'Listmonk · Loading…',
+    null
+  );
 
-    api('/api/listmonk/templates')
+  let l;
+  let t;
 
-  ]);
+  try{
+
+    [l,t]=await Promise.all([
+
+      api('/api/listmonk/lists'),
+
+      api('/api/listmonk/templates')
+
+    ]);
+
+  }catch(e){
+
+    setStatus(
+      'Listmonk · Error',
+      'err'
+    );
+
+    throw e;
+  }
 
 
   /*
-    IMPORTANT FIX:
+  =========================================================
+  IMPORTANT:
+  Support every response shape used by Listmonk/proxy.
 
-    Listmonk returns:
-
-    {
-      data: {
-        total: ...,
-        results: [...]
-      }
-    }
-
-    and not:
-
-    {
-      data: [...]
-    }
+  Possible:
+  data:[]
+  data:{results:[]}
+  results:[]
+  []
+  =========================================================
   */
 
   S.lists=
-    Array.isArray(l.data)
-    ?l.data
-    :(Array.isArray(l.data?.results)
-      ?l.data.results
-      :[]);
-
+    normalizeListmonkResults(l);
 
   S.templates=
-    Array.isArray(t.data)
-    ?t.data
-    :(Array.isArray(t.data?.results)
-      ?t.data.results
-      :[]);
+    normalizeListmonkResults(t);
+
+
+  /*
+  NEVER allow undefined/null here.
+  */
+
+  if(!Array.isArray(S.lists))
+    S.lists=[];
+
+  if(!Array.isArray(S.templates))
+    S.templates=[];
 
 
   setStatus(
     `Listmonk · Connected · ${S.lists.length} lists`,
     'ok'
   );
+
+
+  console.log(
+    '[MY ARENA EMAIL SUITE]',
+    APP_VERSION,
+    {
+      listsResponse:l,
+      templatesResponse:t,
+      lists:S.lists,
+      templates:S.templates
+    }
+  );
+
+
+  return {
+    lists:S.lists,
+    templates:S.templates
+  };
 
 }
 
@@ -2062,17 +2263,60 @@ async function openCampaign(){
 
   }catch(e){
 
-    toast(e.message);
+    toast(
+      e.message
+    );
 
     return;
   }
 
 
+  if(!Array.isArray(S.lists))
+    S.lists=[];
+
+  if(!Array.isArray(S.templates))
+    S.templates=[];
+
+
   if(!S.lists.length){
 
-    toast(
-      'No active Listmonk list'
-    );
+    modal(`
+
+      <h2>
+        Create Listmonk campaign
+      </h2>
+
+      <p>
+        No active Listmonk list was returned.
+      </p>
+
+      <div class="debug">
+        ${esc(
+          'Version: '+APP_VERSION+
+          '\nLists received: '+S.lists.length+
+          '\nTemplates received: '+S.templates.length
+        )}
+      </div>
+
+      <div class="row" style="margin-top:12px">
+
+        <button
+          class="btn"
+          onclick="closeModal()"
+        >
+          Close
+        </button>
+
+        <button
+          class="btn primary"
+          onclick="loadLM().then(()=>openCampaign()).catch(e=>toast(e.message))"
+        >
+          Reload Listmonk
+        </button>
+
+      </div>
+
+    `);
 
     return;
   }
@@ -2091,7 +2335,7 @@ async function openCampaign(){
             value="${Number(l.id)}"
           >
 
-          ${esc(l.name)}
+          ${esc(l.name||('List '+l.id))}
 
         </label>
 
@@ -2105,7 +2349,7 @@ async function openCampaign(){
     t=>`
 
       <option value="${Number(t.id)}">
-        ${esc(t.name)}
+        ${esc(t.name||('Template '+t.id))}
       </option>
 
     `
@@ -2124,7 +2368,7 @@ async function openCampaign(){
 
       <input
         id="cmname"
-        value="${esc(campaignName.value)}"
+        value="${esc(document.getElementById('campaignName')?.value||'')}"
       >
 
     </div>
@@ -2135,7 +2379,7 @@ async function openCampaign(){
 
       <input
         id="cmsub"
-        value="${esc(subject.value)}"
+        value="${esc(document.getElementById('subject')?.value||'')}"
       >
 
     </div>
@@ -2209,6 +2453,7 @@ async function openCampaign(){
     </div>
 
   `);
+
 }
 
 
@@ -2239,12 +2484,24 @@ async function createCampaign(test){
 
   try{
 
-    /*
-      IMPORTANT FIX:
+    const campaignNameEl=
+      document.getElementById('cmname');
 
-      Listmonk campaigns endpoint
-      is /campaigns, not /campaign
-    */
+    const campaignSubjectEl=
+      document.getElementById('cmsub');
+
+    const templateEl=
+      document.getElementById('cmtemplate');
+
+    const sendEl=
+      document.getElementById('cmsend');
+
+    const testEl=
+      document.getElementById('cmtest');
+
+    const preheaderEl=
+      document.getElementById('preheader');
+
 
     let j=await api(
       '/api/listmonk/campaigns',
@@ -2258,25 +2515,27 @@ async function createCampaign(test){
 
         body:JSON.stringify({
 
-          name:cmname.value,
+          name:
+            campaignNameEl?.value||'',
 
-          subject:cmsub.value,
+          subject:
+            campaignSubjectEl?.value||'',
 
           lists:lists,
 
           html:emailHTML(),
 
           template_id:
-            cmtemplate.value
-            ?Number(cmtemplate.value)
+            templateEl?.value
+            ?Number(templateEl.value)
             :null,
 
           send_at:
-            cmsend.value.trim()
+            sendEl?.value.trim()
             ||null,
 
           altbody:
-            preheader.value
+            preheaderEl?.value||''
 
         })
       }
@@ -2284,9 +2543,9 @@ async function createCampaign(test){
 
 
     let id=
-      j.data?.id
+      j?.data?.id
       ||
-      j.id;
+      j?.id;
 
 
     if(!id){
@@ -2294,16 +2553,18 @@ async function createCampaign(test){
       throw Error(
         'Listmonk created the campaign but did not return a campaign ID.'
       );
+
     }
 
 
     if(test){
 
       let emails=
-        cmtest.value
+        testEl?.value
         .split(',')
         .map(x=>x.trim())
-        .filter(Boolean);
+        .filter(Boolean)
+        ||[];
 
 
       if(!emails.length){
@@ -2311,16 +2572,9 @@ async function createCampaign(test){
         throw Error(
           'Enter a test recipient'
         );
+
       }
 
-
-      /*
-        IMPORTANT FIX:
-
-        Test endpoint uses:
-
-        /campaigns/{id}/test
-      */
 
       await api(
         `/api/listmonk/campaigns/${id}/test`,
@@ -2356,9 +2610,17 @@ async function createCampaign(test){
 
   }catch(e){
 
-    toast(e.message);
+    console.error(
+      'Campaign error:',
+      e
+    );
+
+    toast(
+      e.message
+    );
 
   }
+
 }
 
 
@@ -2370,11 +2632,16 @@ function projectStore(){
 
   try{
 
-    return JSON.parse(
-      localStorage.getItem(
-        'mas_projects'
-      )||'[]'
-    );
+    const x=
+      JSON.parse(
+        localStorage.getItem(
+          'mas_projects'
+        )||'[]'
+      );
+
+    return Array.isArray(x)
+      ?x
+      :[];
 
   }catch{
 
@@ -2394,15 +2661,16 @@ function saveProject(){
       Date.now(),
 
     name:
-      campaignName.value,
+      document.getElementById('campaignName')?.value||'',
 
     subject:
-      subject.value,
+      document.getElementById('subject')?.value||'',
 
     source:
       JSON.stringify({
         blocks:S.blocks,
-        preheader:preheader.value
+        preheader:
+          document.getElementById('preheader')?.value||''
       }),
 
     html:
@@ -2471,14 +2739,14 @@ function openProjects(){
 
             <button
               class="btn"
-              onclick="loadProject(${x.id})"
+              onclick="loadProject(${Number(x.id)})"
             >
               Open
             </button>
 
             <button
               class="btn danger"
-              onclick="delProject(${x.id})"
+              onclick="delProject(${Number(x.id)})"
             >
               Delete
             </button>
@@ -2511,21 +2779,49 @@ function loadProject(id){
   }
 
 
-  let s=JSON.parse(
-    x.source
-  );
+  let s;
+
+  try{
+
+    s=JSON.parse(
+      x.source
+    );
+
+  }catch{
+
+    toast(
+      'Project data is invalid'
+    );
+
+    return;
+  }
 
 
-  S.blocks=s.blocks;
+  S.blocks=
+    Array.isArray(s.blocks)
+    ?s.blocks
+    :[];
 
   S.projectId=x.id;
 
-  campaignName.value=x.name;
+  const campaignNameEl=
+    document.getElementById('campaignName');
 
-  subject.value=x.subject;
+  const subjectEl=
+    document.getElementById('subject');
 
-  preheader.value=
-    s.preheader||'';
+  const preheaderEl=
+    document.getElementById('preheader');
+
+  if(campaignNameEl)
+    campaignNameEl.value=x.name||'';
+
+  if(subjectEl)
+    subjectEl.value=x.subject||'';
+
+  if(preheaderEl)
+    preheaderEl.value=
+      s.preheader||'';
 
   S.selected=
     S.blocks[0]?.id||null;
@@ -2568,6 +2864,11 @@ function delProject(id){
 ========================================================= */
 
 newEmail();
+
+console.log(
+  'MY ARENA EMAIL SUITE',
+  APP_VERSION
+);
 
 </script>
 
